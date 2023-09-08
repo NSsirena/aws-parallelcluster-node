@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Callable, Dict, Iterable, Iterator, List, Union
 
 from slurm_plugin.common import log_exception
-from slurm_plugin.slurm_resources import DynamicNode, SlurmNode, StaticNode
+from slurm_plugin.slurm_resources import DynamicNode, SlurmJobInfo, SlurmNode, StaticNode
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,14 @@ CLUSTER_INSTANCE_COUNT = {
 NODE_INSTANCE_MAPPING_EVENT = {
     "message": "Map of node to instance",
     "event_type": "node-instance-mapping-event",
+}
+SCONTROL_SHOW_JOB_INFORMATION = {
+    "message": "Job information from scontrol",
+    "event_type": "scontrol-show-job-information",
+}
+SCONTROL_SHOW_JOB_COUNT = {
+    "message": "Count of the jobs from scontrol",
+    "event_type": "scontrol-show-job-count",
 }
 
 class ClusterEventPublisher:
@@ -839,3 +847,34 @@ class ClusterEventPublisher:
             if instance
             else None
         )
+
+
+    @staticmethod
+    def _job_info_supplier(jobs: List[SlurmJobInfo]) -> Iterator:
+        for job in jobs:
+            yield {
+                "detail": {
+                    "job_id": job.job_id,
+                    "job_name": job.job_name,
+                    "user_id": job.user_id,
+                    "account": job.account,
+                    "job_state": job.job_state,
+                    "run_time": job.run_time,
+                    "start_time": job.start_time.isoformat(timespec="milliseconds") if job.start_time else None,
+                    "end_time": job.end_time.isoformat(timespec="milliseconds") if job.end_time else None,
+                    "partition": job.partition,
+                    "node_list": job.node_list,
+                    "nodes": job.nodes,
+                    "cpu_ids": job.cpu_ids,
+                    "gres": job.gres,
+                }
+            }
+
+    @staticmethod
+    def _job_count_supplier(jobs: List[SlurmJobInfo]) -> Iterator:
+        yield {
+            "detail": {
+                "count": len(jobs),
+                "jobs": [{"job_id": job.job_id} for job in jobs],
+            }
+        }
